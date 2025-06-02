@@ -14,14 +14,25 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Check CMakeLists exists
+      - name: Install Docker
         run: |
-          if [ ! -f CMakeLists.txt ]; then
-            echo "CMakeLists.txt not found!" >&2
-            exit 1
-          fi
+          sudo apt-get update
+          sudo apt-get install -y \
+            ca-certificates \
+            curl \
+            gnupg \
+            software-properties-common
 
-      - name: Create Docker image
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg  | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu  \
+            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+      - name: Build Docker image
         run: |
           docker build -t cpp-builder .
 
@@ -30,17 +41,12 @@ jobs:
           mkdir -p logs
           docker run --rm \
             -v $(pwd):/app \
+            -v $(pwd)/logs:/logs \
             cpp-builder \
-            sh -c "cd /app && cmake . && make"
-
-      - name: Save log manually for debugging
-        run: |
-          echo "Build finished. Checking logs..."
-          cat logs/build.log || echo "No log file yet."
+            sh -c "cd /app && cmake . && make > /logs/build.log 2>&1"
 
       - name: Upload compilation log
         uses: actions/upload-artifact@v4
         with:
           name: build-log
           path: logs/build.log
-          retention-days: 1
