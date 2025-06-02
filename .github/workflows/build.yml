@@ -14,21 +14,33 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check CMakeLists exists
+        run: |
+          if [ ! -f CMakeLists.txt ]; then
+            echo "CMakeLists.txt not found!" >&2
+            exit 1
+          fi
+
       - name: Create Docker image
         run: |
           docker build -t cpp-builder .
 
-      - name: Run and build incide container
+      - name: Run and build inside container
         run: |
           mkdir -p logs
           docker run --rm \
             -v $(pwd):/app \
-            -v $(pwd)/logs:/logs \
             cpp-builder \
-            sh -c "cd /app && cmake . && make > /logs/build.log 2>&1"
+            sh -c "cd /app && cmake . && make"
+
+      - name: Save log manually for debugging
+        run: |
+          echo "Build finished. Checking logs..."
+          cat logs/build.log || echo "No log file yet."
 
       - name: Upload compilation log
         uses: actions/upload-artifact@v4
         with:
           name: build-log
           path: logs/build.log
+          retention-days: 1
